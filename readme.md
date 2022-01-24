@@ -25,8 +25,8 @@
 >    <dependencies>
 >        <dependency>
 >            <groupId>com.github.Verlif</groupId>
->            <artifactId>SpringTaskService</artifactId>
->            <version>alpha-2.6.1-1</version>
+>            <artifactId>task-spring-boot-starter</artifactId>
+>            <version>2.6.1-beta0.1</version>
 >        </dependency>
 >    </dependencies>
 > ```
