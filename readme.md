@@ -6,6 +6,60 @@
 
 ## 使用
 
+1. 启用任务管理服务
+
+在任意配置类上使用`@EnableTaskService`注解启用任务管理服务
+
+2. 制定定时任务
+
+本项目中的定时任务由`TaskService`统一维护，开发者可以通过以下注解标记定时任务：
+- `TaskTip`
+  - 标记在类上时，需要此类实现了`Runnable`接口，否则不会生效。
+  - 标记在方法上时，需要在此类上添加`TaskTipHead`注解以声明此类中的`TaskTip`方法生效。每个`TaskTipHead`只负责一个类的声明。
+
+例如以下代码就会添加3个延时任务（由`@TaskTipHead`声明`task2`与`task3`任务生效，`TaskTest`类上的`TaskTip`声明此类也是一个定时任务）：
+
+```java
+@TaskTipHead
+@TaskTip(value = "test", type = TaskType.DELAY, delay = 2000)
+public class TaskTest implements Runnable {
+
+    @Override
+    public void run() {
+        PrintUtils.print(Level.CONFIG, "任务开始");
+        try {
+            Thread.sleep(1000);
+        } catch (InterruptedException e) {
+            e.printStackTrace();
+        }
+        PrintUtils.print(Level.CONFIG, "任务结束");
+    }
+
+    @TaskTip(value = "task2", type = TaskType.DELAY, delay = 1000)
+    private String task2() {
+        System.out.println("say hello");
+        return hello();
+    }
+    
+    private String hello() {
+        return "hello";
+    }
+
+    @TaskTip(value = "task3", type = TaskType.DELAY, delay = 1000)
+    public void task3() {
+        PrintUtils.print(Level.CONFIG, "task3 is running!");
+    }
+}
+```
+
+需要注意的是，对于不同类型的任务，所需的注解参数是不同的。
+- `CRON`需要`cron()`
+- `REPEAT_DELAY`和`REPEAT_RATE`需要`interval()`，可选`delay()`和`unit()`
+- `DELAY`需要`delay()`，可选`unit()`
+- `auto()`表示了任务是否自动添加到`TaskService`中。
+
+## 添加依赖
+
 1. 添加Jitpack仓库源
 
 > maven
@@ -22,74 +76,27 @@
 
 > maven
 > ```xml
->    <dependencies>
->        <dependency>
->            <groupId>com.github.Verlif</groupId>
->            <artifactId>task-spring-boot-starter</artifactId>
->            <version>2.6.1-beta0.1</version>
->        </dependency>
->    </dependencies>
+> <dependencies>
+>     <dependency>
+>         <groupId>com.github.Verlif</groupId>
+>         <artifactId>task-spring-boot-starter</artifactId>
+>         <version>2.6.6-1.1</version>
+>     </dependency>
+> </dependencies>
 > ```
-
-3. 启用任务管理服务
-
-在任意配置类上使用`@EnableTaskService`注解启用任务管理服务
-
-4. 制定定时任务
-
-本项目中的定时任务由`TaskService`统一维护，开发者可以通过以下注解标记定时任务：
-- `TaskTip`
-
-需要注意的是，对于不同类型的任务，所需的注解参数是不同的。
-- `CRON`需要`cron()`
-- `REPEAT_DELAY`和`REPEAT_RATE`需要`interval()`，可选`delay()`和`unit()`
-- `DELAY`需要`delay()`，可选`unit()`
-
-使用注解后还需要实现`Runnable`接口才可以注册添加到`TaskService`。
-且`TaskService`会在启动时从Bean池中主动加载添加了`@TaskTip`注解的任务。
-
-## 举例
-
-以下方式实现的定时任务需要通过`TaskService.insert(Runnable runnable)`方法手动添加到任务表中。
-
-```java
-@TaskTip(type = TaskType.DELAY, value="name", interval = 5000)
-public class DemoSchedule implements Runnable {
-
-    @Override
-    public void run() {
-        // TODO: 任务内容
-    }
-}
-```
-
-------
-
-以下方式实现的定时任务会自动添加到任务表中。
-- 增加了`@component`注解
-```java
-@Component
-@TaskTip(type = TaskType.DELAY, value="name", interval = 5000)
-public class DemoSchedule implements Runnable {
-
-    @Override
-    public void run() {
-        // TODO: 任务内容
-    }
-}
-```
 
 ------
 
 注意，任务表中不允许出现同名任务，否则会添加不进去。可以在日志中发现未能添加的任务。
 
-## 使用举例
+## 手动执行任务
 
 ```java
 @Autowired
 private TaskService taskService;
 private Runnable task = new DemoRunnable();
 
+public void test() {
     // 使用注解名称或默认名称添加可重复任务
     taskService.insert(task);
     // 使用动态名称添加可重复任务
@@ -98,6 +105,7 @@ private Runnable task = new DemoRunnable();
     taskService.cancel("name");
     // 2000毫秒后执行任务
     taskService.delay(task, 2000);
+}
 ```
 
 ## 配置

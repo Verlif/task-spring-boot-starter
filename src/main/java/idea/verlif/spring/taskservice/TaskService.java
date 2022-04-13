@@ -1,5 +1,7 @@
 package idea.verlif.spring.taskservice;
 
+import idea.verlif.spring.taskservice.anno.TaskTip;
+import idea.verlif.spring.taskservice.anno.TaskTipHead;
 import org.apache.logging.log4j.LogManager;
 import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -8,8 +10,10 @@ import org.springframework.boot.ApplicationRunner;
 import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
+import org.springframework.scheduling.support.ScheduledMethodRunnable;
 import org.springframework.stereotype.Component;
 
+import java.lang.reflect.Method;
 import java.util.Date;
 import java.util.Enumeration;
 import java.util.Map;
@@ -33,7 +37,7 @@ public class TaskService implements ApplicationRunner {
     /**
      * 待添加的任务表
      */
-    private final ConcurrentHashMap<String, Runnable> taskMap;
+    private final ConcurrentHashMap<String, TaskRunnableItem> taskMap;
     /**
      * 可重复任务Map，用于控制任务进度
      */
@@ -46,6 +50,8 @@ public class TaskService implements ApplicationRunner {
     private final ThreadPoolTaskScheduler schedule;
     private final TaskConfig config;
 
+    private final ApplicationContext context;
+
     public TaskService(
             @Autowired ApplicationContext context,
             @Autowired ThreadPoolTaskScheduler schedule,
@@ -53,22 +59,41 @@ public class TaskService implements ApplicationRunner {
     ) {
         this.schedule = schedule;
         this.config = taskConfig;
+        this.context = context;
 
         taskMap = new ConcurrentHashMap<>();
         futureMap = new ConcurrentHashMap<>();
         ready = false;
 
-        Map<String, Runnable> map = context.getBeansOfType(Runnable.class);
-        for (Runnable runnable : map.values()) {
-            insert(runnable);
+        Map<String, Object> map = context.getBeansWithAnnotation(TaskTip.class);
+        for (Object value : map.values()) {
+            if (value instanceof Runnable) {
+                TaskTip tip = value.getClass().getAnnotation(TaskTip.class);
+                if (tip.auto()) {
+                    insert((Runnable) value, tip);
+                }
+            } else {
+                LOGGER.warn("Class [" + value.getClass().getName() + "] is not a runnable object, it can not been loaded!");
+            }
         }
     }
 
     @Override
     public void run(ApplicationArguments args) throws Exception {
+        // 获取公开定时方法
+        Map<String, Object> beans = context.getBeansWithAnnotation(TaskTipHead.class);
+        for (Object bean : beans.values()) {
+            Method[] methods = bean.getClass().getDeclaredMethods();
+            for (Method method : methods) {
+                TaskTip tip = method.getAnnotation(TaskTip.class);
+                if (tip != null && tip.auto()) {
+                    insert(bean, method, tip);
+                }
+            }
+        }
         synchronized (taskMap) {
-            for (Runnable runnable : taskMap.values()) {
-                schedule(null, runnable);
+            for (TaskRunnableItem item : taskMap.values()) {
+                schedule(null, item.getTarget(), item.getTip());
             }
             taskMap.clear();
 
@@ -99,13 +124,9 @@ public class TaskService implements ApplicationRunner {
      * @param runnable 任务对象
      */
     public synchronized void insert(String name, Runnable runnable) {
-        synchronized (taskMap) {
-            if (ready) {
-                schedule(name, runnable);
-            } else {
-                taskMap.put(name, runnable);
-            }
-        }
+        Class<? extends Runnable> cl = runnable.getClass();
+        TaskTip tip = cl.getAnnotation(TaskTip.class);
+        insert(name, runnable, tip);
     }
 
     /**
@@ -115,11 +136,61 @@ public class TaskService implements ApplicationRunner {
      * @param runnable 任务对象
      */
     public synchronized void insert(Runnable runnable) {
-        synchronized (taskMap) {
-            if (ready) {
-                schedule(null, runnable);
-            } else {
-                taskMap.put(runnable.getClass().getSimpleName(), runnable);
+        Class<? extends Runnable> cl = runnable.getClass();
+        TaskTip tip = cl.getAnnotation(TaskTip.class);
+        insert(cl.getSimpleName(), runnable, tip);
+    }
+
+    /**
+     * 添加定时任务 <br/>
+     *
+     * @param runnable 任务对象
+     * @param tip      任务参数
+     */
+    public synchronized void insert(Runnable runnable, TaskTip tip) {
+        insert(runnable.getClass().getSimpleName(), runnable, tip);
+    }
+
+    /**
+     * 添加定时任务 <br/>
+     *
+     * @param runnable 任务对象
+     * @param tip      任务参数
+     */
+    public synchronized void insert(String name, Runnable runnable, TaskTip tip) {
+        Class<? extends Runnable> cl = runnable.getClass();
+        if (tip == null) {
+            LOGGER.warn("Runnable [" + cl.getName() + "] lack annotation '@TaskTip', it can not been loaded!");
+        } else {
+            synchronized (taskMap) {
+                if (ready) {
+                    schedule(null, runnable, tip);
+                } else {
+                    taskMap.put(name, new TaskRunnableItem(runnable, tip));
+                }
+            }
+        }
+    }
+
+    /**
+     * 添加定时任务 <br/>
+     * 添加的任务需要带有{@link TaskTip}注解
+     *
+     * @param bean   方法的目标对象
+     * @param method 任务方法
+     * @param tip    任务参数
+     */
+    public synchronized void insert(Object bean, Method method, TaskTip tip) {
+        if (tip == null) {
+            LOGGER.warn("Runnable [" + method.getName() + "] lack annotation '@TaskTip', it can not been loaded!");
+        } else {
+            synchronized (taskMap) {
+                Runnable runnable = new ScheduledMethodRunnable(bean, method);
+                if (ready) {
+                    schedule(null, runnable, tip);
+                } else {
+                    taskMap.put(method.getName(), new TaskRunnableItem(runnable, tip));
+                }
             }
         }
     }
@@ -185,14 +256,20 @@ public class TaskService implements ApplicationRunner {
      * @param runnable    任务对象
      */
     private void schedule(String defaultName, Runnable runnable) {
+        TaskTip tip = runnable.getClass().getAnnotation(TaskTip.class);
+        schedule(defaultName, runnable, tip);
+    }
+
+    /**
+     * 添加定时任务
+     *
+     * @param defaultName 任务名称；null则使用注解提供的名称规则
+     * @param runnable    任务对象
+     * @param tip         任务参数
+     */
+    private void schedule(String defaultName, Runnable runnable, TaskTip tip) {
         Class<?> cl = runnable.getClass();
-        TaskTip tip = cl.getAnnotation(TaskTip.class);
-        // 检测注解是否存在
-        if (tip == null) {
-            LOGGER.warn("Runnable [" + cl.getName() + "] lack annotation TaskComponent, it can not been loaded!");
-            return;
-        }
-        String name = defaultName != null ? defaultName : tip.value().length() == 0 ? cl.getSimpleName() : tip.value();
+        String name = defaultName != null ? defaultName : tip.value().length() == 0 ? cl.getSimpleName() + cl.hashCode() : tip.value();
         // 检测任务是否重复
         if (futureMap.containsKey(name)) {
             LOGGER.warn("Already exist task " + name + "!!!");
@@ -241,4 +318,5 @@ public class TaskService implements ApplicationRunner {
             LOGGER.warn("Can not insert this task: " + name);
         }
     }
+
 }

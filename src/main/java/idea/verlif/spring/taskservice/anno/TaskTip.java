@@ -1,4 +1,7 @@
-package idea.verlif.spring.taskservice;
+package idea.verlif.spring.taskservice.anno;
+
+import idea.verlif.spring.taskservice.TaskType;
+import org.springframework.stereotype.Component;
 
 import java.lang.annotation.ElementType;
 import java.lang.annotation.Retention;
@@ -13,6 +16,7 @@ import java.util.concurrent.TimeUnit;
  */
 @Target({ElementType.TYPE, ElementType.METHOD})
 @Retention(RetentionPolicy.RUNTIME)
+@Component
 public @interface TaskTip {
 
     /**
@@ -65,4 +69,10 @@ public @interface TaskTip {
      * </ul>
      */
     TimeUnit unit() default TimeUnit.MILLISECONDS;
+
+    /**
+     * 是否自动添加到任务执行器中
+     * @return true - 自动添加； false - 手动添加
+     */
+    boolean auto() default true;
 }
