@@ -102,7 +102,9 @@ public class TaskService implements ApplicationRunner {
             while (enumeration.hasMoreElements()) {
                 sb.append(enumeration.nextElement()).append(", ");
             }
-            LOGGER.info("Already loaded repeatable tasks with " + futureMap.size() + " - " + sb.substring(0, sb.length() - 2));
+            if (sb.length() > 0) {
+                LOGGER.info("Already loaded repeatable tasks with " + futureMap.size() + " - " + sb.substring(0, sb.length() - 2));
+            }
             ready = true;
         }
     }

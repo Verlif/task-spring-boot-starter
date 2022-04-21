@@ -80,7 +80,7 @@ public class TaskTest implements Runnable {
 >     <dependency>
 >         <groupId>com.github.Verlif</groupId>
 >         <artifactId>task-spring-boot-starter</artifactId>
->         <version>2.6.6-1.1</version>
+>         <version>2.6.6-1.2</version>
 >     </dependency>
 > </dependencies>
 > ```
