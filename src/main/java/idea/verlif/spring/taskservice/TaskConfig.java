@@ -7,7 +7,10 @@ import org.springframework.context.annotation.Configuration;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.regex.Pattern;
 
 /**
  * 任务配置
@@ -35,17 +38,56 @@ public class TaskConfig {
      */
     private Integer maxSize = 20;
 
-    @Bean
-    @ConditionalOnMissingBean(ThreadPoolTaskScheduler.class)
-    public ThreadPoolTaskScheduler threadPoolTaskScheduler() {
+    /**
+     * 是否启用正则名称匹配
+     */
+    private boolean regex = false;
+
+    private final Map<String, Pattern> patternMap;
+
+    public TaskConfig() {
+        patternMap = new HashMap<>();
+    }
+
+    @Bean("schedulerForTask")
+    @ConditionalOnMissingBean(name = "schedulerForTask")
+    public ThreadPoolTaskScheduler schedulerForTask() {
         ThreadPoolTaskScheduler scheduler = new ThreadPoolTaskScheduler();
-        scheduler.setThreadFactory(Thread::new);
+        scheduler.setThreadFactory(r -> {
+            Thread t = new Thread(r);
+            t.setName("task-" + t.getId());
+            return t;
+        });
         scheduler.setPoolSize(maxSize);
         return scheduler;
     }
 
     public boolean isAllowed(String value) {
-        return allowed.size() == 0 && !blocked.contains(value) || allowed.contains(value);
+        if (regex) {
+            if (allowed.size() > 0) {
+                for (String s : allowed) {
+                    Pattern pattern = getPattern(s);
+                    if (pattern.matcher(value).matches()) {
+                        return true;
+                    }
+                }
+            }
+            if (blocked.size() > 0) {
+                for (String s : blocked) {
+                    Pattern pattern = getPattern(s);
+                    if (pattern.matcher(value).matches()) {
+                        return false;
+                    }
+                }
+            }
+            return true;
+        } else {
+            return allowed.size() == 0 && !blocked.contains(value) || allowed.contains(value);
+        }
+    }
+
+    private Pattern getPattern(String key) {
+        return patternMap.computeIfAbsent(key, Pattern::compile);
     }
 
     public List<String> getAllowed() {
@@ -66,6 +108,14 @@ public class TaskConfig {
 
     public void setMaxSize(Integer maxSize) {
         this.maxSize = maxSize;
+    }
+
+    public boolean isRegex() {
+        return regex;
+    }
+
+    public void setRegex(boolean regex) {
+        this.regex = regex;
     }
 
     public void addAllowed(String allowed) {

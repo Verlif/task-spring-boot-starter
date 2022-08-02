@@ -62,28 +62,30 @@ public class TaskTest implements Runnable {
 
 1. 添加Jitpack仓库源
 
-> maven
-> ```xml
-> <repositories>
->    <repository>
->        <id>jitpack.io</id>
->        <url>https://jitpack.io</url>
->    </repository>
-> </repositories>
-> ```
+maven
+
+```xml
+<repositories>
+   <repository>
+       <id>jitpack.io</id>
+       <url>https://jitpack.io</url>
+   </repository>
+</repositories>
+```
 
 2. 添加依赖
 
-> maven
-> ```xml
-> <dependencies>
->     <dependency>
->         <groupId>com.github.Verlif</groupId>
->         <artifactId>task-spring-boot-starter</artifactId>
->         <version>2.6.6-1.2</version>
->     </dependency>
-> </dependencies>
-> ```
+maven
+
+```xml
+<dependencies>
+    <dependency>
+        <groupId>com.github.Verlif</groupId>
+        <artifactId>task-spring-boot-starter</artifactId>
+        <version>2.6.6-1.3</version>
+    </dependency>
+</dependencies>
+```
 
 ------
 
@@ -109,11 +111,17 @@ public void test() {
 ```
 
 ## 配置
+
 在`application.yml`中通过以下配置限制任务表。被限制的任务是无法自动或手动添加到任务表中的。
+
 ```yaml
 station:
   # 可重复任务配置
   task:
+    # 执行任务的最大线程数，默认20
+    maxSize: 2
+    # 是否开启正则名称匹配，对allowed与blocked参数生效。默认false
+    regex: false
     # 允许的可重复任务列表。格式为yml的列表格式
     allowed:
       - name1
@@ -123,3 +131,5 @@ station:
       - name3
       - name4
 ```
+
+请注意，`allowed`的优先级高于`blocked`。

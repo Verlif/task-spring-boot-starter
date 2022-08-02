@@ -13,6 +13,7 @@ import org.springframework.scheduling.support.CronTrigger;
 import org.springframework.scheduling.support.ScheduledMethodRunnable;
 import org.springframework.stereotype.Component;
 
+import javax.annotation.Resource;
 import java.lang.reflect.Method;
 import java.util.Date;
 import java.util.Enumeration;
@@ -47,17 +48,16 @@ public class TaskService implements ApplicationRunner {
      */
     private boolean ready;
 
-    private final ThreadPoolTaskScheduler schedule;
+    @Resource(name = "schedulerForTask")
+    private ThreadPoolTaskScheduler schedule;
     private final TaskConfig config;
 
     private final ApplicationContext context;
 
     public TaskService(
             @Autowired ApplicationContext context,
-            @Autowired ThreadPoolTaskScheduler schedule,
             @Autowired TaskConfig taskConfig
     ) {
-        this.schedule = schedule;
         this.config = taskConfig;
         this.context = context;
 
@@ -73,7 +73,7 @@ public class TaskService implements ApplicationRunner {
                     insert((Runnable) value, tip);
                 }
             } else {
-                LOGGER.warn("Class [" + value.getClass().getName() + "] is not a runnable object, it can not been loaded!");
+                LOGGER.warn("Class [{}] is not a runnable object, it can not been loaded!", value.getClass().getName());
             }
         }
     }
@@ -103,7 +103,7 @@ public class TaskService implements ApplicationRunner {
                 sb.append(enumeration.nextElement()).append(", ");
             }
             if (sb.length() > 0) {
-                LOGGER.info("Already loaded repeatable tasks with " + futureMap.size() + " - " + sb.substring(0, sb.length() - 2));
+                LOGGER.info("Already loaded repeatable tasks with {} - {}", futureMap.size(), sb.substring(0, sb.length() - 2));
             }
             ready = true;
         }
@@ -162,7 +162,7 @@ public class TaskService implements ApplicationRunner {
     public synchronized void insert(String name, Runnable runnable, TaskTip tip) {
         Class<? extends Runnable> cl = runnable.getClass();
         if (tip == null) {
-            LOGGER.warn("Runnable [" + cl.getName() + "] lack annotation '@TaskTip', it can not been loaded!");
+            LOGGER.warn("Runnable [{}] lack annotation '@TaskTip', it can not been loaded!", cl.getName());
         } else {
             synchronized (taskMap) {
                 if (ready) {
@@ -184,7 +184,7 @@ public class TaskService implements ApplicationRunner {
      */
     public synchronized void insert(Object bean, Method method, TaskTip tip) {
         if (tip == null) {
-            LOGGER.warn("Runnable [" + method.getName() + "] lack annotation '@TaskTip', it can not been loaded!");
+            LOGGER.warn("Runnable [{}] lack annotation '@TaskTip', it can not been loaded!", method.getName());
         } else {
             synchronized (taskMap) {
                 Runnable runnable = new ScheduledMethodRunnable(bean, method);
@@ -271,10 +271,10 @@ public class TaskService implements ApplicationRunner {
      */
     private void schedule(String defaultName, Runnable runnable, TaskTip tip) {
         Class<?> cl = runnable.getClass();
-        String name = defaultName != null ? defaultName : tip.value().length() == 0 ? cl.getSimpleName() + cl.hashCode() : tip.value();
+        String name = defaultName != null ? defaultName : tip.name().length() == 0 ? cl.getSimpleName() + cl.hashCode() : tip.name();
         // 检测任务是否重复
         if (futureMap.containsKey(name)) {
-            LOGGER.warn("Already exist task " + name + "!!!");
+            LOGGER.warn("Already exist task {}!!!", name);
             return;
         }
         // 检测任务是否可添加
@@ -282,7 +282,7 @@ public class TaskService implements ApplicationRunner {
             switch (tip.type()) {
                 case CRON: {
                     if (tip.cron().length() == 0) {
-                        LOGGER.warn("Can not load runnable " + name + ", it is needed to set cron");
+                        LOGGER.warn("Can not load runnable {}, it is needed to set cron", name);
                         break;
                     }
                     ScheduledFuture<?> future = schedule.schedule(runnable, new CronTrigger(tip.cron()));
@@ -293,7 +293,7 @@ public class TaskService implements ApplicationRunner {
                 }
                 case REPEAT_DELAY: {
                     if (tip.interval() == 0) {
-                        LOGGER.warn("Can not load runnable " + name + ", it is needed to set interval");
+                        LOGGER.warn("Can not load runnable {}, it is needed to set interval", name);
                         break;
                     }
                     ScheduledFuture<?> future = schedule.scheduleWithFixedDelay(runnable, new Date(System.currentTimeMillis() + tip.unit().toMillis(tip.delay())), tip.unit().toMillis(tip.interval()));
@@ -302,7 +302,7 @@ public class TaskService implements ApplicationRunner {
                 }
                 case REPEAT_RATE: {
                     if (tip.interval() == 0) {
-                        LOGGER.warn("Can not load runnable " + name + ", it is needed to set interval");
+                        LOGGER.warn("Can not load runnable {}, it is needed to set interval", name);
                         break;
                     }
                     ScheduledFuture<?> future = schedule.scheduleAtFixedRate(runnable, new Date(System.currentTimeMillis() + tip.unit().toMillis(tip.delay())), tip.unit().toMillis(tip.interval()));
@@ -314,10 +314,10 @@ public class TaskService implements ApplicationRunner {
                     break;
                 }
                 default:
-                    LOGGER.warn("No such task type " + tip.type() + " for " + name);
+                    LOGGER.warn("No such task type {} for {}", tip.type(), name);
             }
         } else {
-            LOGGER.warn("Can not insert this task: " + name);
+            LOGGER.warn("Task - {} is disabled.", name);
         }
     }
 

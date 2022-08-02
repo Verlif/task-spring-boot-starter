@@ -22,7 +22,7 @@ public @interface TaskTip {
     /**
      * 定时任务名称（唯一），默认类名
      */
-    String value() default "";
+    String name() default "";
 
     /**
      * 任务类型
@@ -72,6 +72,7 @@ public @interface TaskTip {
 
     /**
      * 是否自动添加到任务执行器中
+     *
      * @return true - 自动添加； false - 手动添加
      */
     boolean auto() default true;
