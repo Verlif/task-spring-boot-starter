@@ -17,10 +17,10 @@
   - 标记在类上时，需要此类实现了`Runnable`接口，否则不会生效。
   - 标记在方法上时，需要在此类上添加`TaskTipHead`注解以声明此类中的`TaskTip`方法生效。每个`TaskTipHead`只负责一个类的声明。
 
-例如以下代码就会添加3个延时任务（由`@TaskTipHead`声明`task2`与`task3`任务生效，`TaskTest`类上的`TaskTip`声明此类也是一个定时任务）：
+例如以下代码就会添加3个延时任务（由`@TaskTipHead`声明`task2`与`task3`任务会被加载，并且只有在运行配置包括了`dev`或`local`的情况下才会生效。`TaskTest`类上的`TaskTip`声明此类也是一个定时任务，但不受`TaskTipHead`的影响）：
 
 ```java
-@TaskTipHead
+@TaskTipHead(profiles = {"dev", "local"})
 @TaskTip(value = "test", type = TaskType.DELAY, delay = 2000)
 public class TaskTest implements Runnable {
 
@@ -82,7 +82,7 @@ maven
     <dependency>
         <groupId>com.github.Verlif</groupId>
         <artifactId>task-spring-boot-starter</artifactId>
-        <version>2.6.6-1.3</version>
+        <version>2.6.6-1.3.1</version>
     </dependency>
 </dependencies>
 ```

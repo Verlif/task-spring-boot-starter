@@ -16,4 +16,12 @@ import java.lang.annotation.Target;
 @Retention(RetentionPolicy.RUNTIME)
 @Component
 public @interface TaskTipHead {
+
+    /**
+     * 开启任务的环境
+     *
+     * @return 环境标签数组
+     */
+    String[] profiles() default {};
+
 }

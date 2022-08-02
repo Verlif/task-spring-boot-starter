@@ -15,12 +15,11 @@ import org.springframework.stereotype.Component;
 
 import javax.annotation.Resource;
 import java.lang.reflect.Method;
-import java.util.Date;
-import java.util.Enumeration;
-import java.util.Map;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Stream;
 
 /**
  * 任务服务。<br/>
@@ -82,7 +81,16 @@ public class TaskService implements ApplicationRunner {
     public void run(ApplicationArguments args) throws Exception {
         // 获取公开定时方法
         Map<String, Object> beans = context.getBeansWithAnnotation(TaskTipHead.class);
+        Stream<String> pros = Arrays.stream(context.getEnvironment().getActiveProfiles());
         for (Object bean : beans.values()) {
+            TaskTipHead head = bean.getClass().getAnnotation(TaskTipHead.class);
+            // 检测是否在此类的可执行环境中
+            if (head.profiles().length > 0) {
+                List<String> enas = Arrays.asList(head.profiles());
+                if (pros.noneMatch(enas::contains)) {
+                    continue;
+                }
+            }
             Method[] methods = bean.getClass().getDeclaredMethods();
             for (Method method : methods) {
                 TaskTip tip = method.getAnnotation(TaskTip.class);
@@ -274,7 +282,7 @@ public class TaskService implements ApplicationRunner {
         String name = defaultName != null ? defaultName : tip.name().length() == 0 ? cl.getSimpleName() + cl.hashCode() : tip.name();
         // 检测任务是否重复
         if (futureMap.containsKey(name)) {
-            LOGGER.warn("Already exist task {}!!!", name);
+            LOGGER.warn("Already exist task - {}!!!", name);
             return;
         }
         // 检测任务是否可添加
@@ -317,7 +325,7 @@ public class TaskService implements ApplicationRunner {
                     LOGGER.warn("No such task type {} for {}", tip.type(), name);
             }
         } else {
-            LOGGER.warn("Task - {} is disabled.", name);
+            LOGGER.debug("Task - {} is disabled.", name);
         }
     }
 
