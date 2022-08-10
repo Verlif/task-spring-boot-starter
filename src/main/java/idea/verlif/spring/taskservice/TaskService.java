@@ -7,6 +7,7 @@ import org.apache.logging.log4j.Logger;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.ApplicationArguments;
 import org.springframework.boot.ApplicationRunner;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.ApplicationContext;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskScheduler;
 import org.springframework.scheduling.support.CronTrigger;
@@ -30,6 +31,7 @@ import java.util.stream.Stream;
  * @date 2021/12/21 11:46
  */
 @Component
+@ConditionalOnProperty(prefix = "station.task", value = "enabled", matchIfMissing = true)
 public class TaskService implements ApplicationRunner {
 
     private final static Logger LOGGER = LogManager.getLogger(TaskService.class);

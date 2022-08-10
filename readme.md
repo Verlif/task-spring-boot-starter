@@ -82,7 +82,7 @@ maven
     <dependency>
         <groupId>com.github.Verlif</groupId>
         <artifactId>task-spring-boot-starter</artifactId>
-        <version>2.6.6-1.3.1</version>
+        <version>2.6.6-1.3.2</version>
     </dependency>
 </dependencies>
 ```
@@ -118,6 +118,8 @@ public void test() {
 station:
   # 可重复任务配置
   task:
+    # 是否启用任务服务，默认开启。关闭后，不会通过此服务加载定时任务。
+    enabled: true
     # 执行任务的最大线程数，默认20
     maxSize: 2
     # 是否开启正则名称匹配，对allowed与blocked参数生效。默认false
